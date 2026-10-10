@@ -54,34 +54,46 @@ settings. Copy the base VHDX before creating each VM.
 
 This is a cloud image: it has **no default login password**. Before booting,
 attach a NoCloud seed ISO labeled `cidata` containing `user-data` and `meta-data`.
-For example, create these files on Linux or WSL (replace the example SSH key):
+Use the interactive [New-CloudInitSeed.ps1](scripts/New-CloudInitSeed.ps1) wizard
+on Windows. It works with Windows PowerShell 5.1 and PowerShell 7 and uses
+Windows' built-in IMAPI2 components. No WSL, ISO utility, module installation,
+optical drive, or administrator rights are required to create the ISO.
 
-`user-data`:
+From a checkout:
 
-```yaml
-#cloud-config
-users:
-  - default
-ssh_authorized_keys:
-  - ssh-ed25519 REPLACE_WITH_YOUR_PUBLIC_KEY
-ssh_pwauth: false
+```powershell
+.\scripts\New-CloudInitSeed.ps1
 ```
 
-`meta-data` (use a unique instance ID for each VM):
+Or download just the self-contained script and run it:
 
-```yaml
-instance-id: resolute-vm-001
-local-hostname: resolute-vm-001
+```powershell
+Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/difanz/ubuntu-hyper-v/main/scripts/New-CloudInitSeed.ps1' -OutFile .\New-CloudInitSeed.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\New-CloudInitSeed.ps1
 ```
 
-Create the ISO with `genisoimage` and attach it to the VM's virtual DVD drive:
+The wizard prompts for:
 
-```sh
-genisoimage -output seed.iso -volid cidata -joliet -rock user-data meta-data
-```
+1. VM hostname (default `ubuntu-resolute`).
+2. Login username (default `ubuntu`).
+3. An SSH public key: paste an OpenSSH key or enter a `.pub` file path. If present,
+   `%USERPROFILE%\.ssh\id_ed25519.pub` is offered as the default.
+4. Output ISO path (default `<hostname>-seed.iso` in the current directory).
 
-Boot from the VHDX and SSH as `ubuntu` with the matching private key. Keep private
-keys and passwords out of this repository and its release artifacts.
+It creates **one `cidata` ISO containing both `user-data` and `meta-data`**, with
+a new unique instance ID, UTF-8 encoding without a BOM, and Joliet filenames.
+The chosen user gets passwordless sudo; password login and root SSH login are
+disabled. Existing ISOs are replaced only after an explicit prompt, and temporary
+files are cleaned up. Ctrl+C cancels the wizard.
+
+Attach the ISO through **VM Settings → SCSI Controller → DVD Drive → Image file**
+before first boot. Boot from the VHDX, then SSH using the chosen username and
+the private key matching the public key. The script leaves VM creation and ISO
+attachment to you. DHCP is used by the stock cloud image.
+
+Generate a separate seed for each new VM. Changing the seed on an already
+initialized VM is not a substitute for editing that VM's configuration.
+Keep private keys and passwords out of this repository and its release artifacts.
 
 The virtual disk retains Ubuntu's original capacity. Before first boot, expand
 it using Hyper-V's **Edit Disk → Expand** if you need more space; cloud-init
@@ -99,6 +111,10 @@ the real sparse-disk conversion test:
 ```sh
 python3 -m unittest discover -s tests -v
 ```
+
+Windows CI also runs `tests/seed-smoke.ps1` under both PowerShell 5.1 and 7.
+It drives the prompts, checks invalid input and overwrite handling, and parses
+the resulting ISO to verify its label, filenames, encoding and cloud-init data.
 
 References: [Ubuntu image artifacts and verification](https://ubuntu.com/docs/public-images/public-images-reference/artifacts/),
 [QEMU disk formats](https://www.qemu.org/docs/master/system/images.html),

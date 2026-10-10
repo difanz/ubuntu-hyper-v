@@ -6,6 +6,7 @@
 *.vhd
 *.vhdx
 *.raw
+*.iso
 /work/
 /dist/
 __pycache__/
