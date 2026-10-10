@@ -107,6 +107,10 @@ using System.Runtime.InteropServices.ComTypes;
 
 namespace CloudInitSeed {
     public static class IsoStream {
+        public static void Replace(string source, string destination) {
+            // Preserve a true null; PowerShell converts null string arguments to "".
+            File.Replace(source, destination, null);
+        }
         public static void Save(object source, string path, long expectedLength) {
             IStream stream = (IStream)source;
             IntPtr count = Marshal.AllocHGlobal(sizeof(int));
@@ -141,7 +145,7 @@ namespace CloudInitSeed {
         $stream = $result.ImageStream
         [CloudInitSeed.IsoStream]::Save($stream, $partial, ([long]$result.TotalBlocks * $result.BlockSize))
         if ($Overwrite -and [IO.File]::Exists($outputFile)) {
-            [IO.File]::Replace($partial, $outputFile, $null)
+            [CloudInitSeed.IsoStream]::Replace($partial, $outputFile)
         }
         else { [IO.File]::Move($partial, $outputFile) }
         Write-Host "Created: $outputFile" -ForegroundColor Green
