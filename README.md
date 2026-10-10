@@ -56,8 +56,9 @@ This is a cloud image: it has **no default login password**. Before booting,
 attach a NoCloud seed ISO labeled `cidata` containing `user-data` and `meta-data`.
 For example, create these files on Linux or WSL (replace the example SSH key):
 
+`user-data`:
+
 ```yaml
-# user-data
 #cloud-config
 users:
   - default
@@ -66,8 +67,9 @@ ssh_authorized_keys:
 ssh_pwauth: false
 ```
 
+`meta-data` (use a unique instance ID for each VM):
+
 ```yaml
-# meta-data — use a unique instance-id for each VM
 instance-id: resolute-vm-001
 local-hostname: resolute-vm-001
 ```
