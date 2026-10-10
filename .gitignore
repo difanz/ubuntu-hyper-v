@@ -1,0 +1,8 @@
+.DS_Store
+
+# Downloaded and generated disk images
+*.img
+*.qcow2
+*.vhd
+*.vhdx
+*.raw
