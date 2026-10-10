@@ -1,0 +1,71 @@
+name: Build Resolute Hyper-V image
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '37 6 * * *'
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends qemu-utils
+      - run: python3 -m unittest discover -s tests -v
+
+  release:
+    needs: test
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    concurrency:
+      group: resolute-amd64-release
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Install signature verification tools
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ubuntu-keyring gpgv
+      - name: Resolve and authenticate upstream; skip published images
+        id: source
+        run: python3 scripts/image.py prepare
+      - name: Install conversion tools
+        if: steps.source.outputs.skip != 'true'
+        run: sudo apt-get install -y --no-install-recommends qemu-utils xz-utils
+      - name: Download, verify, convert, compare and compress
+        if: steps.source.outputs.skip != 'true'
+        run: python3 scripts/image.py build
+      - name: Publish complete release
+        if: steps.source.outputs.skip != 'true'
+        env:
+          TAG: ${{ steps.source.outputs.tag }}
+          SOURCE_DATE: ${{ steps.source.outputs.source_date }}
+          DRAFT_EXISTS: ${{ steps.source.outputs.draft_exists }}
+        run: |
+          if [ "$DRAFT_EXISTS" != true ]; then
+            gh release create "$TAG" --draft --target "$GITHUB_SHA" \
+              --title "Ubuntu Resolute amd64 — source $SOURCE_DATE" \
+              --notes-file dist/release-notes.md
+          fi
+          gh release upload "$TAG" dist/*.vhdx.xz dist/SHA256SUMS \
+            dist/build.json dist/upstream-SHA256SUMS dist/upstream-SHA256SUMS.gpg --clobber
+          gh release edit "$TAG" --draft=false --latest \
+            --title "Ubuntu Resolute amd64 — source $SOURCE_DATE" \
+            --notes-file dist/release-notes.md
+          printf '\nPublished: %s/releases/tag/%s\n' \
+            "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" "$TAG" >> "$GITHUB_STEP_SUMMARY"
