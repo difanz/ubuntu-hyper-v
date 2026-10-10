@@ -38,4 +38,10 @@ try {
     if ($script:Answers.Count -ne 0) { throw 'Wizard did not consume expected answers.' }
     Write-Host "Seed ISO smoke tests passed on PowerShell $($PSVersionTable.PSVersion)."
 }
+catch {
+    $detail = ($_ | Out-String) + $_.ScriptStackTrace
+    $detail = $detail.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+    Write-Host "::error::$detail"
+    throw
+}
 finally { Remove-Item -LiteralPath $testDir -Recurse -Force }
